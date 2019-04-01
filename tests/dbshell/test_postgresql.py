@@ -1,13 +1,14 @@
 import os
 import signal
-import subprocess
-from unittest import mock
+from subprocess import CalledProcessError, CompletedProcess, PIPE
+from unittest import mock, skipUnless
 
+from django.db import connection
 from django.db.backends.postgresql.client import DatabaseClient
-from django.test import SimpleTestCase
+from django.test import TestCase
 
 
-class PostgreSqlDbshellCommandTestCase(SimpleTestCase):
+class PostgreSqlDbshellCommandTestCase(TestCase):
 
     def _run_it(self, dbinfo):
         """
@@ -19,7 +20,7 @@ class PostgreSqlDbshellCommandTestCase(SimpleTestCase):
         def _mock_subprocess_run(*args, env=os.environ, **kwargs):
             self.subprocess_args = list(*args)
             self.pgpassword = env.get('PGPASSWORD')
-            return subprocess.CompletedProcess(self.subprocess_args, 0)
+            return CompletedProcess(self.subprocess_args, 0)
         with mock.patch('subprocess.run', new=_mock_subprocess_run):
             DatabaseClient.runshell_db(dbinfo)
         return self.subprocess_args, self.pgpassword
@@ -94,3 +95,19 @@ class PostgreSqlDbshellCommandTestCase(SimpleTestCase):
             DatabaseClient.runshell_db({})
         # dbshell restores the original handler.
         self.assertEqual(sigint_handler, signal.getsignal(signal.SIGINT))
+
+    @skipUnless(connection.vendor == 'postgresql', 'PostgreSQL tests')
+    def test_exec(self):
+        client = DatabaseClient(connection)
+        run_result = client.runshell(input=b'\\dt', stdout=PIPE, stderr=PIPE)
+        self.assertTrue(run_result.stdout)
+        self.assertFalse(run_result.stderr)
+
+    @skipUnless(connection.vendor == 'postgresql', 'PostgreSQL tests')
+    def test_fail_exec(self):
+        # The psql PostgreSQL cient does not fail on invalid SQL queries. Make login fail instead.
+        client = DatabaseClient(connection)
+        with mock.patch('django.db.backends.postgresql.base.DatabaseWrapper.get_connection_params') as mock_params:
+            mock_params.return_value = {}
+            self.assertRaises(CalledProcessError, client.runshell, input=b'SELECT * FROM user_tables;', stdout=PIPE, stderr=PIPE)
+            mock_params.assert_called_once()

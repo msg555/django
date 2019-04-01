@@ -9,7 +9,7 @@ class DatabaseClient(BaseDatabaseClient):
     executable_name = 'psql'
 
     @classmethod
-    def runshell_db(cls, conn_params):
+    def runshell_db(cls, conn_params, **run_kwargs):
         args = [cls.executable_name]
 
         host = conn_params.get('host', '')
@@ -33,10 +33,10 @@ class DatabaseClient(BaseDatabaseClient):
         try:
             # Allow SIGINT to pass to psql to abort queries.
             signal.signal(signal.SIGINT, signal.SIG_IGN)
-            subprocess.run(args, check=True, env=subprocess_env)
+            return subprocess.run(args, check=True, env=subprocess_env, **run_kwargs)
         finally:
             # Restore the original SIGINT handler.
             signal.signal(signal.SIGINT, sigint_handler)
 
-    def runshell(self):
-        DatabaseClient.runshell_db(self.connection.get_connection_params())
+    def runshell(self, **run_kwargs):
+        return DatabaseClient.runshell_db(self.connection.get_connection_params(), **run_kwargs)

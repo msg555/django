@@ -8,10 +8,10 @@ class DatabaseClient(BaseDatabaseClient):
     executable_name = 'sqlplus'
     wrapper_name = 'rlwrap'
 
-    def runshell(self):
+    def runshell(self, **run_kwargs):
         conn_string = self.connection._connect_string()
         args = [self.executable_name, "-L", conn_string]
         wrapper_path = shutil.which(self.wrapper_name)
         if wrapper_path:
             args = [wrapper_path, *args]
-        subprocess.check_call(args)
+        return subprocess.run(args, check=True, **run_kwargs)

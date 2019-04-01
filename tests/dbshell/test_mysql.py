@@ -1,8 +1,12 @@
+from subprocess import CalledProcessError, PIPE
+from unittest import skipUnless
+
+from django.db import connection
 from django.db.backends.mysql.client import DatabaseClient
-from django.test import SimpleTestCase
+from django.test import TestCase
 
 
-class MySqlDbshellCommandTestCase(SimpleTestCase):
+class MySqlDbshellCommandTestCase(TestCase):
 
     def test_fails_with_keyerror_on_incomplete_config(self):
         with self.assertRaises(KeyError):
@@ -75,6 +79,18 @@ class MySqlDbshellCommandTestCase(SimpleTestCase):
                     },
                 },
             }))
+
+    @skipUnless(connection.vendor == 'mysql', 'MySQL tests')
+    def test_exec(self):
+        client = DatabaseClient(connection)
+        run_result = client.runshell(input=b'SHOW VARIABLES', stdout=PIPE, stderr=PIPE)
+        self.assertTrue(run_result.stdout)
+        self.assertFalse(run_result.stderr)
+
+    @skipUnless(connection.vendor == 'mysql', 'MySQL tests')
+    def test_exec(self):
+        client = DatabaseClient(connection)
+        self.assertRaises(CalledProcessError, client.runshell, input=b'invalid', stdout=PIPE, stderr=PIPE)
 
     def get_command_line_arguments(self, connection_settings):
         return DatabaseClient.settings_to_cmd_args(connection_settings)

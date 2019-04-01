@@ -43,6 +43,6 @@ class DatabaseClient(BaseDatabaseClient):
             args += [db]
         return args
 
-    def runshell(self):
+    def runshell(self, **run_kwargs):
         args = DatabaseClient.settings_to_cmd_args(self.connection.settings_dict)
-        subprocess.check_call(args)
+        return subprocess.run(args, check=True, **run_kwargs)
